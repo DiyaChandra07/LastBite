@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}LastBite · SmartScan{% endblock %}
+{% block content %}
+<section class="scan-header"><p class="eyebrow">SMARTSCAN</p><h1>Scan it. <em>Check it.</em></h1><p class="lead">Upload a clear photo of the product or its date label. Review everything before it enters My Fridge.</p></section>
+<div class="scan-layout">
+  <section class="scan-panel">
+    <div class="panel-icon">📸</div><h2>1. Add a product photo</h2>
+    <p>For best results, photograph the product name and the printed date clearly.</p>
+    <form method="post" enctype="multipart/form-data" class="upload-form">
+      <label class="upload-box"><span>＋</span><strong>Choose a photo</strong><small>JPG, PNG or WEBP · max 8 MB</small><input type="file" name="photo" accept="image/png,image/jpeg,image/webp" required></label>
+      <button class="button primary full" type="submit">Read photo</button>
+    </form>
+    <div class="privacy-tip">🔒 Photo is stored locally with this prototype. Avoid uploading personal documents.</div>
+  </section>
+  {% if extracted.image_filename %}
+  <section class="scan-panel review-panel">
+    <p class="eyebrow">REVIEW REQUIRED</p><h2>2. Confirm product details</h2>
+    <img class="scan-preview" src="{{ url_for('static', filename='uploads/' + extracted.image_filename) }}" alt="Uploaded product package">
+    <div class="notice">{{ scan_note }}</div>
+    {% if extracted.ocr_text %}<details class="ocr-details"><summary>View text read from image</summary><pre>{{ extracted.ocr_text }}</pre></details>{% endif %}
+    <form method="post" action="{{ url_for('save_scan') }}" class="edit-form">
+      <input type="hidden" name="image_filename" value="{{ extracted.image_filename }}">
+      <label>Product name<input name="name" required value="{{ extracted.name }}" placeholder="e.g. Whole milk"></label>
+      <div class="two-fields"><label>Quantity<input name="quantity" type="number" min="0.1" step="0.1" value="1" required></label><label>Unit<select name="unit">{% for u in ['item','pack','g','kg','ml','litre','bunch','cups','container'] %}<option>{{ u }}</option>{% endfor %}</select></label></div>
+      <label>Category<select name="category">{% for c in ['Fruits','Vegetables','Dairy','Grains','Meat & Seafood','Bakery','Frozen','Other'] %}<option>{{ c }}</option>{% endfor %}</select></label>
+      <label>Printed expiry / best-before date (optional)<input type="date" name="expiry_date" value="{{ extracted.expiry_date }}" ></label>
+      <label class="check-label"><input type="checkbox" name="expiry_confirmed" value="yes"> I have checked that the date above matches the package</label>
+      <p class="small-note">If the date is unclear, leave it blank. No date will be guessed.</p>
+      <button class="button primary full" type="submit">Add to My Fridge</button>
+    </form>
+  </section>
+  {% else %}
+  <section class="scan-panel how-panel"><div class="panel-icon">🔎</div><h2>What happens next?</h2><ol><li>LastBite tries to read text from the photo if optional OCR is installed.</li><li>Only a complete, unambiguous date can be suggested.</li><li>You review the product name and confirm any date yourself.</li></ol><div class="notice">Dates like “03/04/25” can mean different things. LastBite leaves ambiguous dates blank instead of guessing.</div></section>
+  {% endif %}
+</div>
+<a class="back-link" href="{{ url_for('index') }}">← Back to My Fridge</a>
+{% endblock %}

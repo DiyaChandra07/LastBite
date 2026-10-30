@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}LastBite · My Fridge{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-copy">
+    <p class="eyebrow">YOUR FOOD, IN FOCUS</p>
+    <h1>Fresh food.<br><em>Less forgotten.</em></h1>
+    <p class="lead">Keep track of what you have, check package dates, and get a nudge before food gets overlooked.</p>
+    <div class="hero-actions"><a class="button primary" href="{{ url_for('scan') }}">📸 Scan a product</a><a class="button secondary" href="#fridge">View my fridge ↓</a></div>
+  </div>
+  <div class="hero-art" aria-hidden="true"><div class="sun"></div><div class="produce produce-one">🥑</div><div class="produce produce-two">🥬</div><div class="produce produce-three">🍋</div><div class="leaf leaf-one"></div><div class="leaf leaf-two"></div></div>
+</section>
+<section class="stats">
+  <div class="stat"><span>IN YOUR FRIDGE</span><strong>{{ total }}</strong><small>tracked products</small></div>
+  <div class="stat"><span>NEEDS A LOOK</span><strong>{{ attention }}</strong><small>soon, past listed date, or unconfirmed</small></div>
+  <div class="stat"><span>REMINDERS</span><strong>{{ reminders|length }}</strong><small>currently due</small></div>
+</section>
+
+<section class="section" id="reminders">
+  <div class="section-heading"><div><p class="eyebrow">A LITTLE HEADS-UP</p><h2>Smart reminders <span class="emoji">🔔</span></h2></div><p>Choose a reminder window for each item. Updating its date recalculates the schedule.</p></div>
+  {% if reminders %}
+  <div class="reminder-list">
+    {% for reminder in reminders %}
+    <article class="reminder-card">
+      <div class="reminder-symbol">◷</div>
+      <div class="reminder-main"><strong>{{ reminder.item.name }}</strong><span>{% if reminder.days == 0 %}Listed expiry date is today{% else %}Listed date is in {{ reminder.days }} day(s){% endif %}</span></div>
+      <span class="pill {{ 'warning' if reminder.days <= 1 else 'soft' }}">Check package</span>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-note">No reminders due right now. Confirm dates on your products to create a reliable schedule.</div>
+  {% endif %}
+  <p class="small-note">LastBite reminders are shown when you open the app. Browser push notifications are not enabled in this prototype.</p>
+</section>
+
+<section class="section" id="fridge">
+  <div class="section-heading"><div><p class="eyebrow">WHAT YOU ALREADY HAVE</p><h2>My Fridge <span class="emoji">🧊</span></h2></div><a class="text-link" href="{{ url_for('scan') }}">+ Add with SmartScan</a></div>
+  <form class="filter-bar" method="get" action="{{ url_for('index') }}">
+    <input type="search" name="q" placeholder="Search products…" value="{{ search_query }}">
+    <select name="category" aria-label="Filter by category">{% for cat in categories %}<option value="{{ cat }}" {% if cat == selected_category %}selected{% endif %}>{{ cat }}</option>{% endfor %}</select>
+    <button class="button secondary" type="submit">Filter</button>
+    <a class="clear-link" href="{{ url_for('index') }}#fridge">Reset</a>
+  </form>
+  {% if items %}
+  <div class="product-grid">
+  {% for item in items %}
+    <article class="product-card">
+      <div class="product-photo">
+        {% if item.image_filename %}<img src="{{ url_for('static', filename='uploads/' + item.image_filename) }}" alt="{{ item.name }} package photo">{% else %}
+          <span>{% if item.category == 'Fruits' %}🍎{% elif item.category == 'Vegetables' %}🥬{% elif item.category == 'Dairy' %}🥛{% elif item.category == 'Grains' %}🌾{% elif item.category == 'Meat & Seafood' %}🥚{% elif item.category == 'Bakery' %}🍞{% elif item.category == 'Frozen' %}🧊{% else %}🛒{% endif %}</span>
+        {% endif %}
+        <span class="category-tag">{{ item.category }}</span>
+      </div>
+      <div class="product-info">
+        <div class="product-title"><h3>{{ item.name }}</h3><span class="qty">{{ item.quantity|int if item.quantity == item.quantity|int else item.quantity }} {{ item.unit }}</span></div>
+        {% if item.expiry_date and item.expiry_confirmed %}<p class="date-line">Listed date: <strong>{{ item.expiry_date }}</strong></p>{% else %}<p class="date-line unknown-date">Expiry date not confirmed</p>{% endif %}
+        <span class="status {{ item.status.key }}">{{ item.status.label }}</span>
+        <details class="edit-details"><summary>Edit details / reminder</summary>
+          <form method="post" action="{{ url_for('update_item', item_id=item.id) }}" class="edit-form">
+            <label>Product name<input name="name" required value="{{ item.name }}"></label>
+            <div class="two-fields"><label>Quantity<input name="quantity" type="number" min="0.1" step="0.1" required value="{{ item.quantity }}"></label><label>Unit<select name="unit">{% for u in ['item','pack','g','kg','ml','litre','bunch','cups','container'] %}<option {% if u == item.unit %}selected{% endif %}>{{ u }}</option>{% endfor %}</select></label></div>
+            <label>Category<select name="category">{% for c in categories if c != 'All' %}<option {% if c == item.category %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+            <label>Expiry date (optional)<input type="date" name="expiry_date" value="{{ item.expiry_date or '' }}"></label>
+            <label class="check-label"><input type="checkbox" name="expiry_confirmed" value="yes" {% if item.expiry_confirmed %}checked{% endif %}> I checked this date on the package</label>
+            <label>Remind me within<select name="reminder_days">{% for n in [0,1,2,3,5,7] %}<option value="{{ n }}" {% if n == item.reminder_days %}selected{% endif %}>{% if n == 0 %}On the listed date only{% else %}{{ n }} day(s) before{% endif %}</option>{% endfor %}</select></label>
+            <button class="button primary full" type="submit">Save changes</button>
+          </form>
+        </details>
+        <form method="post" action="{{ url_for('delete_item', item_id=item.id) }}" onsubmit="return confirm('Remove this product from My Fridge?')"><button class="delete-button" type="submit">Remove</button></form>
+      </div>
+    </article>
+  {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state"><div>🥕</div><h3>Your fridge starts here</h3><p>Add demo products to explore LastBite, or scan a product package to add your own.</p><form method="post" action="{{ url_for('seed_demo') }}"><button class="button primary" type="submit">Load demo data</button></form><a class="text-link" href="{{ url_for('scan') }}">Or scan a product →</a></div>
+  {% endif %}
+  <div class="demo-tools"><form method="post" action="{{ url_for('seed_demo') }}"><button class="button secondary" type="submit">＋ Load demo products</button></form><form method="post" action="{{ url_for('clear_all') }}" onsubmit="return confirm('Clear all products? This cannot be undone.')"><button class="text-button" type="submit">Clear fridge</button></form></div>
+</section>
+<div class="safety-note"><strong>Quick safety note</strong><span>A date alert is not a food-safety verdict. Check package storage instructions and the food itself. LastBite never fills in an uncertain expiry date for you.</span></div>
+{% endblock %}

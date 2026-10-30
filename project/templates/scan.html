@@ -1,0 +1,464 @@
+
+{% extends "base.html" %}
+{% block title %}LastBite · SmartScan{% endblock %}
+
+{% block content %}
+
+<section class="scan-header">
+  <p class="eyebrow">SMARTSCAN</p>
+  <h1>Scan it. <em>Check it.</em></h1>
+  <p class="lead">
+    Take photos or upload pictures of your product.
+    NVIDIA Vision AI will attempt to identify the name,
+    quantity, category and printed date.
+    Review everything before adding it to My Fridge.
+  </p>
+</section>
+
+<div class="scan-layout">
+
+  <!-- LEFT: SMART SCANNER -->
+  <section class="scan-panel">
+
+    <div class="panel-icon">📸</div>
+    <h2>1. Scan your product</h2>
+
+    <p>
+      Add up to 5 photos of the same product.
+      Include a close-up of the printed date if available.
+    </p>
+
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      class="upload-form"
+      id="scan-form"
+    >
+
+      <div class="upload-box">
+
+        <!-- Plus sign opens camera -->
+        <button
+          type="button"
+          id="open-camera"
+          aria-label="Open camera"
+          style="
+            background:none;
+            border:none;
+            color:#19765a;
+            font-size:36px;
+            cursor:pointer;
+            padding:0;
+          "
+        >
+          ＋
+        </button>
+
+        <strong>Take a photo</strong>
+        <small>Click + to open camera</small>
+
+        <div style="margin-top:15px;">
+          <label for="photo-input">
+            Or choose existing photos
+          </label>
+
+          <input
+            type="file"
+            id="photo-input"
+            name="photos"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+          >
+        </div>
+
+        <small>JPG, PNG or WEBP · Up to 5 photos</small>
+
+      </div>
+
+      <!-- Click the camera preview to capture -->
+      <video
+        id="camera-preview"
+        autoplay
+        playsinline
+        muted
+        hidden
+        title="Click to capture a photo"
+        aria-label="Live camera preview. Click to take a photo."
+        style="
+          width:100%;
+          border-radius:12px;
+          margin-top:12px;
+          cursor:pointer;
+        "
+      ></video>
+
+      <p id="camera-hint" hidden
+         style="text-align:center;margin:8px 0;">
+        📸 Click the live camera image to take a photo
+      </p>
+
+      <div id="selected-photos" aria-live="polite"></div>
+
+      <button
+        class="button primary full"
+        type="submit"
+        id="scan-submit"
+      >
+        ✨ Scan Product with NVIDIA AI
+      </button>
+
+    </form>
+
+    <div class="privacy-tip">
+      🔒 Photos are stored locally in this prototype.
+      Avoid uploading personal documents.
+    </div>
+
+  </section>
+
+  <!-- RIGHT: PRODUCT REVIEW -->
+  {% if extracted.image_filename %}
+
+  <section class="scan-panel review-panel">
+
+    <p class="eyebrow">REVIEW REQUIRED</p>
+    <h2>2. Confirm product details</h2>
+
+    <img
+      class="scan-preview"
+      src="{{ url_for('static', filename='uploads/' + extracted.image_filename) }}"
+      alt="Uploaded product package"
+    >
+
+    {% if scan_note %}
+    <div class="notice">{{ scan_note }}</div>
+    {% endif %}
+
+    {% if extracted.ocr_text %}
+    <details class="ocr-details">
+      <summary>View text read from image</summary>
+      <pre>{{ extracted.ocr_text }}</pre>
+    </details>
+    {% endif %}
+
+    <form
+      method="post"
+      action="{{ url_for('save_scan') }}"
+      class="edit-form"
+    >
+
+      <input
+        type="hidden"
+        name="image_filename"
+        value="{{ extracted.image_filename }}"
+      >
+
+      <label>
+        Product name
+        <input
+          name="name"
+          required
+          value="{{ extracted.name or '' }}"
+          placeholder="e.g. Haldiram's Samosa"
+        >
+      </label>
+
+      <div class="two-fields">
+
+        <label>
+          Quantity
+          <input
+            name="quantity"
+            type="number"
+            min="0.1"
+            step="any"
+            value="{{ extracted.quantity if extracted.quantity is not none else 1 }}"
+            required
+          >
+        </label>
+
+        <label>
+          Unit
+          <select name="unit">
+            {% for u in [
+              'item', 'pack', 'g', 'kg', 'ml',
+              'litre', 'bunch', 'cups', 'container'
+            ] %}
+            <option
+              value="{{ u }}"
+              {% if extracted.unit == u %}selected{% endif %}
+            >
+              {{ u }}
+            </option>
+            {% endfor %}
+          </select>
+        </label>
+
+      </div>
+
+      <label>
+        Category
+        <select name="category">
+          {% for c in [
+            'Fruits', 'Vegetables', 'Dairy',
+            'Grains', 'Meat & Seafood',
+            'Bakery', 'Frozen', 'Other'
+          ] %}
+          <option
+            value="{{ c }}"
+            {% if extracted.category == c %}selected{% endif %}
+          >
+            {{ c }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>
+        Printed expiry / best-before date (optional)
+        <input
+          type="date"
+          name="expiry_date"
+          value="{{ extracted.expiry_date or '' }}"
+        >
+      </label>
+
+      <label class="check-label">
+        <input
+          type="checkbox"
+          name="expiry_confirmed"
+          value="yes"
+        >
+        I have checked this date against the package
+      </label>
+
+      <p class="small-note">
+        AI can misread dates and quantities.
+        Correct mistakes before saving.
+        If the date is unclear, leave it blank.
+      </p>
+
+      <button class="button primary full" type="submit">
+        Add to My Fridge
+      </button>
+
+    </form>
+
+  </section>
+
+  {% else %}
+
+  <!-- RIGHT: INSTRUCTIONS -->
+  <section class="scan-panel how-panel">
+
+    <div class="panel-icon">🔎</div>
+    <h2>What happens next?</h2>
+
+    <ol>
+      <li>Click + to take a photo or upload existing photos.</li>
+      <li>Include a close-up of the printed date if available.</li>
+      <li>NVIDIA Vision AI attempts to read product details.</li>
+      <li>It identifies the name, quantity and category.</li>
+      <li>It attempts to detect the expiry or best-before date.</li>
+      <li>Review and confirm everything before saving.</li>
+    </ol>
+
+    <div class="notice">
+      Dates such as 03/04/25 may be ambiguous.
+      LastBite does not guess missing or unclear dates.
+    </div>
+
+  </section>
+
+  {% endif %}
+
+</div>
+
+<a class="back-link" href="{{ url_for('index') }}">
+  ← Back to My Fridge
+</a>
+
+<script>
+const form = document.getElementById("scan-form");
+const fileInput = document.getElementById("photo-input");
+const openCamera = document.getElementById("open-camera");
+const video = document.getElementById("camera-preview");
+const cameraHint = document.getElementById("camera-hint");
+const selectedPhotos = document.getElementById("selected-photos");
+const scanSubmit = document.getElementById("scan-submit");
+
+const MAX_PHOTOS = 5;
+const MAX_TOTAL_SIZE = 7 * 1024 * 1024;
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp"
+];
+
+let photos = [];
+let cameraStream = null;
+let submitting = false;
+
+function stopCamera() {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+
+  video.srcObject = null;
+  video.hidden = true;
+  cameraHint.hidden = true;
+}
+
+function updatePhotos() {
+  selectedPhotos.replaceChildren();
+
+  photos.forEach((file, index) => {
+    const row = document.createElement("p");
+
+    const name = document.createElement("span");
+    name.textContent = `${index + 1}. ${file.name} `;
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remove";
+
+    remove.addEventListener("click", () => {
+      photos.splice(index, 1);
+      updatePhotos();
+    });
+
+    row.append(name, remove);
+    selectedPhotos.appendChild(row);
+  });
+}
+
+function addPhoto(file) {
+  if (photos.length >= MAX_PHOTOS) {
+    alert("Maximum 5 photos allowed.");
+    return;
+  }
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    alert("Only JPG, PNG and WEBP photos are supported.");
+    return;
+  }
+
+  const currentSize = photos.reduce(
+    (sum, photo) => sum + photo.size,
+    0
+  );
+
+  if (currentSize + file.size > MAX_TOTAL_SIZE) {
+    alert("Combined photos must be under 7 MB.");
+    return;
+  }
+
+  photos.push(file);
+  updatePhotos();
+}
+
+fileInput.addEventListener("change", () => {
+  const selectedFiles = Array.from(fileInput.files);
+
+  selectedFiles.forEach(file => {
+    addPhoto(file);
+  });
+
+  fileInput.value = "";
+});
+
+// Clicking + opens the camera.
+openCamera.addEventListener("click", async () => {
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("Camera API unavailable");
+    }
+
+    if (!cameraStream) {
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false
+      });
+    }
+
+    video.srcObject = cameraStream;
+    video.hidden = false;
+    cameraHint.hidden = false;
+
+    await video.play();
+
+  } catch (error) {
+    alert(
+      "Camera unavailable. Check permissions " +
+      "or open LastBite using localhost/HTTPS."
+    );
+    stopCamera();
+  }
+});
+
+// Clicking the live preview captures a photo.
+video.addEventListener("click", () => {
+  if (!video.videoWidth) return;
+
+  if (photos.length >= MAX_PHOTOS) {
+    alert("Maximum 5 photos allowed.");
+    return;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  canvas.getContext("2d").drawImage(video, 0, 0);
+
+  canvas.toBlob(blob => {
+    if (!blob) {
+      alert("Unable to capture photo.");
+      return;
+    }
+
+    const file = new File(
+      [blob],
+      `lastbite-camera-${Date.now()}.jpg`,
+      { type: "image/jpeg" }
+    );
+
+    addPhoto(file);
+    stopCamera();
+
+  }, "image/jpeg", 0.85);
+});
+
+// Submit all selected photos.
+form.addEventListener("submit", event => {
+  if (submitting) {
+    event.preventDefault();
+    return;
+  }
+
+  if (photos.length === 0) {
+    event.preventDefault();
+    alert("Please upload or capture at least one photo.");
+    return;
+  }
+
+  const transfer = new DataTransfer();
+
+  photos.forEach(photo => {
+    transfer.items.add(photo);
+  });
+
+  fileInput.files = transfer.files;
+
+  submitting = true;
+  scanSubmit.disabled = true;
+  scanSubmit.textContent = "Scanning with NVIDIA AI...";
+
+  stopCamera();
+});
+
+window.addEventListener("pagehide", stopCamera);
+</script>
+
+{% endblock %}
